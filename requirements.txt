@@ -1,0 +1,12 @@
+streamlit
+streamlit-authenticator
+streamlit-extras
+python-dotenv
+langchain
+openai
+faiss-cpu
+chromadb
+boto3
+langchain-community
+langchain-core
+langchain-openai
