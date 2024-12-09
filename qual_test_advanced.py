@@ -49,13 +49,24 @@ def get_cached_embedding(word, embedding_model):
     c.execute("SELECT embedding FROM embeddings WHERE word = ?", (word,))
     result = c.fetchone()
     if result:
-        logging.info(f"Embedding for '{word}' retrieved from cache.")
-        return np.frombuffer(result[0], dtype=np.float32)
+        embedding = np.frombuffer(result[0], dtype=np.float32)
+
+        if len(embedding) != faiss_index.d:
+            # If dimensionality is incorrect, regenerate and update the cache
+            logging.warning(f"Embedding for '{word}' has incorrect dimensionality: {len(embedding)}. Regenerating...")
+            embedding = embedding_model.embed_query(word)
+            c.execute("UPDATE embeddings SET embedding = ? WHERE word = ?", (np.array(embedding, dtype=np.float32).tobytes(), word))
+            logging.info(f"Embedding for '{word}' updated and cached with dimensionality: {len(embedding)}")
+            conn.commit()
+        else:
+            logging.info(f"Embedding for '{word}' retrieved from cache with dimensionality: {len(embedding)}")
+        return embedding
     else:
-        logging.info(f"Embedding for '{word}' generated and cached.")
+        # Generate and cache embedding
         embedding = embedding_model.embed_query(word)
-        c.execute("INSERT INTO embeddings (word, embedding) VALUES (?, ?)", (word, np.array(embedding).tobytes()))
+        c.execute("INSERT INTO embeddings (word, embedding) VALUES (?, ?)", (word, np.array(embedding, dtype=np.float32).tobytes()))
         conn.commit()
+        logging.info(f"Embedding for '{word}' generated and cached with dimensionality: {len(embedding)}")
         return np.array(embedding, dtype=np.float32)
 
 
